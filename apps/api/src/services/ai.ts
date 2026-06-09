@@ -2,6 +2,22 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
 
+interface GeminiPart {
+  text: string;
+}
+
+interface GeminiContent {
+  parts: GeminiPart[];
+}
+
+interface GeminiCandidate {
+  content: GeminiContent;
+}
+
+interface GeminiResponse {
+  candidates?: GeminiCandidate[];
+}
+
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
@@ -88,7 +104,7 @@ export async function generateFlowWithAI(
         }),
       }
     );
-    const geminiData = (await geminiResponse.json()) as any;
+    const geminiData = (await geminiResponse.json()) as GeminiResponse;
     responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } else if (openai) {
     const response = await openai.chat.completions.create({
@@ -208,7 +224,7 @@ export async function chatWithAI(
         }),
       }
     );
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as GeminiResponse;
     return data.candidates?.[0]?.content?.parts?.[0]?.text || agent.fallbackMessage || 'I\'m not sure about that.';
   } else if (openai) {
     const response = await openai.chat.completions.create({

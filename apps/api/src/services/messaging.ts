@@ -6,6 +6,22 @@ interface SendMessageResult {
   error?: string;
 }
 
+interface WhatsAppApiResponse {
+  error?: {
+    message: string;
+  };
+  messages?: Array<{
+    id: string;
+  }>;
+}
+
+interface InstagramApiResponse {
+  error?: {
+    message: string;
+  };
+  message_id?: string;
+}
+
 export async function sendMessage(
   conversation: any,
   messageData: {
@@ -74,11 +90,11 @@ async function sendWhatsAppMessage(
   });
 
   if (!response.ok) {
-    const error = (await response.json()) as any;
+    const error = (await response.json()) as WhatsAppApiResponse;
     return { success: false, error: error.error?.message || 'Failed to send message' };
   }
 
-  const result = (await response.json()) as any;
+  const result = (await response.json()) as WhatsAppApiResponse;
   return { success: true, messageId: result.messages?.[0]?.id };
 }
 
@@ -113,11 +129,11 @@ async function sendInstagramMessage(
   });
 
   if (!response.ok) {
-    const error = (await response.json()) as any;
+    const error = (await response.json()) as InstagramApiResponse;
     return { success: false, error: error.error?.message || 'Failed to send message' };
   }
 
-  const result = (await response.json()) as any;
+  const result = (await response.json()) as InstagramApiResponse;
   return { success: true, messageId: result.message_id };
 }
 
