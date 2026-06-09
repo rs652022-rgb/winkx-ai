@@ -88,7 +88,7 @@ export async function generateFlowWithAI(
         }),
       }
     );
-    const geminiData = await geminiResponse.json();
+    const geminiData = (await geminiResponse.json()) as any;
     responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } else if (openai) {
     const response = await openai.chat.completions.create({
@@ -208,7 +208,7 @@ export async function chatWithAI(
         }),
       }
     );
-    const data = await response.json();
+    const data = (await response.json()) as any;
     return data.candidates?.[0]?.content?.parts?.[0]?.text || agent.fallbackMessage || 'I\'m not sure about that.';
   } else if (openai) {
     const response = await openai.chat.completions.create({

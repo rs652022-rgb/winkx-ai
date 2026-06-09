@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   Users, UserPlus, Search, Filter, Loader2, Phone, Mail, Tag,
   MessageSquare, MoreVertical, Building2, Star, ChevronRight,
-  TrendingUp, Funnel, Target,
+  TrendingUp, Target,
 } from 'lucide-react';
 import { crmApi } from '@/lib/api';
 import { formatRelativeTime, cn } from '@/lib/utils';
@@ -221,7 +221,7 @@ export default function CRMPage() {
           <div>
             {pipelines.length === 0 ? (
               <div className="text-center py-20">
-                <Funnel className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <Filter className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-4">No pipelines yet</p>
                 <button onClick={() => crmApi.createPipeline('Sales Pipeline').then(() => queryClient.invalidateQueries({ queryKey: ['crm-pipelines'] }))} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium">Create Pipeline</button>
               </div>

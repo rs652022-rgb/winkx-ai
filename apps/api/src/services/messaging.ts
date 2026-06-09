@@ -74,11 +74,11 @@ async function sendWhatsAppMessage(
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = (await response.json()) as any;
     return { success: false, error: error.error?.message || 'Failed to send message' };
   }
 
-  const result = await response.json();
+  const result = (await response.json()) as any;
   return { success: true, messageId: result.messages?.[0]?.id };
 }
 
@@ -113,11 +113,11 @@ async function sendInstagramMessage(
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = (await response.json()) as any;
     return { success: false, error: error.error?.message || 'Failed to send message' };
   }
 
-  const result = await response.json();
+  const result = (await response.json()) as any;
   return { success: true, messageId: result.message_id };
 }
 

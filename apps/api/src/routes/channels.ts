@@ -114,7 +114,7 @@ router.post('/connect/instagram', authenticate, requireOrg, requireRole('ADMIN',
       return res.status(400).json({ error: 'Invalid Instagram Business account credentials' });
     }
 
-    const igData = await verifyResponse.json();
+    const igData = (await verifyResponse.json()) as any;
 
     const channel = await prisma.channel.upsert({
       where: { orgId_externalId: { orgId, externalId: data.igAccountId } },
@@ -168,7 +168,7 @@ router.post('/connect/facebook', authenticate, requireOrg, requireRole('ADMIN', 
       return res.status(400).json({ error: 'Invalid Facebook Page credentials' });
     }
 
-    const pageData = await verifyResponse.json();
+    const pageData = (await verifyResponse.json()) as any;
 
     const channel = await prisma.channel.upsert({
       where: { orgId_externalId: { orgId, externalId: data.pageId } },

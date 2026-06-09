@@ -103,7 +103,7 @@ router.post('/chat', authenticate, requireOrg, aiRateLimiter, async (req, res, n
 
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-    const reply = await chatWithAI(agent, message, conversationHistory, sessionId);
+    const reply = await chatWithAI(agent, message, conversationHistory as any, sessionId);
 
     res.json({ reply, sessionId });
   } catch (error) {

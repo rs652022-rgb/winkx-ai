@@ -245,7 +245,7 @@ router.post('/deals', authenticate, requireOrg, async (req, res, next) => {
         ...data,
         stage: data.stage as any,
         expectedClose: data.expectedClose ? new Date(data.expectedClose) : undefined,
-      },
+      } as any,
     });
     res.status(201).json({ deal });
   } catch (error) { next(error); }
@@ -309,7 +309,7 @@ router.post('/tasks', authenticate, requireOrg, async (req, res, next) => {
         orgId,
         ...data,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-      },
+      } as any,
     });
     res.status(201).json({ task });
   } catch (error) { next(error); }

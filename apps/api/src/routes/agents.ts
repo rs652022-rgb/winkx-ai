@@ -139,7 +139,7 @@ router.post('/knowledge-bases/:kbId/documents', authenticate, requireOrg, async 
         knowledgeBaseId: req.params.kbId,
         ...data,
         sourceType: data.sourceType as any,
-      },
+      } as any,
     });
 
     // Queue document processing

@@ -41,7 +41,7 @@ router.post('/', authenticate, requireOrg, async (req, res, next) => {
         ...data,
         startTime: new Date(data.startTime),
         endTime: new Date(data.endTime),
-      },
+      } as any,
     });
     res.status(201).json({ appointment });
   } catch (error) { next(error); }

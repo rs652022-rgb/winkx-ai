@@ -55,7 +55,7 @@ router.post('/', authenticate, requireOrg, async (req, res, next) => {
         type: data.type as any,
         channel: data.channel as any,
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
-      },
+      } as any,
     });
     res.status(201).json({ campaign });
   } catch (error) { next(error); }
