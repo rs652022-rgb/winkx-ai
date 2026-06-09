@@ -13,6 +13,16 @@ import { configureSwagger } from './lib/swagger';
 import { rateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
+import { validateEnv } from './lib/env';
+import { checkDatabaseConnection } from './lib/db-check';
+
+process.on('uncaughtException', (error) => {
+  logger.error('CRITICAL: Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 // Routes
 import authRoutes from './routes/auth';
@@ -77,12 +87,30 @@ configureSwagger(app);
 app.use('/api/', rateLimiter);
 
 // Health check
-app.get('/health', (_, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
-  });
+app.get('/health', async (_, res) => {
+  try {
+    const envStatus = validateEnv();
+    const dbStatus = await checkDatabaseConnection();
+    const isHealthy = envStatus.valid && dbStatus.connected;
+
+    res.status(isHealthy ? 200 : 500).json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0',
+      env: {
+        valid: envStatus.valid,
+        missingRequired: envStatus.missingRequired,
+        missingOptional: envStatus.missingOptional,
+      },
+      database: {
+        connected: dbStatus.connected,
+        error: dbStatus.error,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Health check endpoint failed:', error);
+    res.status(500).json({ status: 'error', error: error.message || String(error) });
+  }
 });
 
 // API Routes
@@ -110,6 +138,9 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
+
+// Validate environment variables on startup
+validateEnv();
 
 httpServer.listen(PORT, () => {
   logger.info(`🚀 WinkX AI API running on port ${PORT}`);

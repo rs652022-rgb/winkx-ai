@@ -136,6 +136,10 @@ export async function requireOrg(req: Request, res: Response, next: NextFunction
   }
 }
 
+export function getRequestOrgId(req: Request): string | undefined {
+  return req.orgMember?.orgId || req.apiKeyOrgId || req.params.orgId || (req.headers['x-org-id'] as string);
+}
+
 export function requireRole(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.user?.isSuperAdmin) return next();

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { authenticate, requireOrg } from '../middleware/auth';
+import { authenticate, requireOrg, getRequestOrgId } from '../middleware/auth';
 import { aiRateLimiter } from '../middleware/rateLimiter';
 import { generateFlowWithAI, chatWithAI, generateContent } from '../services/ai';
 import prisma from '@winkx/db/src/client';
@@ -22,7 +22,8 @@ router.post('/generate-flow', authenticate, requireOrg, aiRateLimiter, async (re
       provider: z.enum(['openai', 'anthropic', 'gemini']).default('openai'),
     }).parse(req.body);
 
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     const flowData = await generateFlowWithAI(prompt, channelType, provider);
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg } from '../middleware/auth';
+import { authenticate, requireOrg, getRequestOrgId } from '../middleware/auth';
 
 const router = Router();
 
@@ -14,7 +14,8 @@ const router = Router();
  */
 router.get('/conversations', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { status, channelId, assignedToId, search, page = '1', limit = '20' } = req.query;
 
     const where: any = { orgId };
@@ -124,6 +125,7 @@ router.get('/conversations/:conversationId', authenticate, requireOrg, async (re
  */
 router.post('/conversations/:conversationId/messages', authenticate, requireOrg, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const data = z.object({
       content: z.string().min(1).optional(),
       type: z.string().default('TEXT'),
@@ -143,7 +145,7 @@ router.post('/conversations/:conversationId/messages', authenticate, requireOrg,
 
     // Send via appropriate platform API
     const { sendMessage } = await import('../services/messaging');
-    const result = await sendMessage(conversation, data as any, req.user!.id);
+    const result = await sendMessage(conversation, data as any, req.user.id);
 
     const message = await prisma.message.create({
       data: {
@@ -155,7 +157,7 @@ router.post('/conversations/:conversationId/messages', authenticate, requireOrg,
         mediaUrl: data.mediaUrl,
         mediaCaption: data.mediaCaption,
         status: result.success ? 'SENT' : 'FAILED',
-        sentById: req.user!.id,
+        sentById: req.user.id,
         sentAt: new Date(),
         externalId: result.messageId,
         failureReason: result.error,
@@ -238,13 +240,14 @@ router.patch('/conversations/:conversationId/status', authenticate, requireOrg, 
  */
 router.post('/conversations/:conversationId/notes', authenticate, requireOrg, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
 
     const note = await prisma.internalNote.create({
       data: {
         conversationId: req.params.conversationId,
         content,
-        authorId: req.user!.id,
+        authorId: req.user.id,
       },
     });
 
@@ -263,7 +266,8 @@ router.post('/conversations/:conversationId/notes', authenticate, requireOrg, as
  */
 router.get('/stats', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     const [total, open, pending, closed, unread] = await Promise.all([
       prisma.conversation.count({ where: { orgId } }),

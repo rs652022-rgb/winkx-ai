@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg, requireRole } from '../middleware/auth';
+import { authenticate, requireOrg, requireRole, getRequestOrgId } from '../middleware/auth';
 
 const router = Router();
 
@@ -14,7 +14,8 @@ const router = Router();
  */
 router.get('/', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { status, channelId, search } = req.query;
 
     const where: any = { orgId };
@@ -46,7 +47,8 @@ router.get('/', authenticate, requireOrg, async (req, res, next) => {
  */
 router.post('/', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     const data = z.object({
       name: z.string().min(1),

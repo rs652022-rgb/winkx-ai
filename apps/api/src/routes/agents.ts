@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg } from '../middleware/auth';
+import { authenticate, requireOrg, getRequestOrgId } from '../middleware/auth';
 
 const router = Router();
 
 // AI AGENTS
 router.get('/', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const agents = await prisma.aIAgent.findMany({
       where: { orgId },
       include: {
@@ -22,7 +23,8 @@ router.get('/', authenticate, requireOrg, async (req, res, next) => {
 
 router.post('/', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const data = z.object({
       name: z.string().min(1),
       description: z.string().optional(),
@@ -92,7 +94,8 @@ router.delete('/:agentId', authenticate, requireOrg, async (req, res, next) => {
 // KNOWLEDGE BASES
 router.get('/knowledge-bases', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const kbs = await prisma.knowledgeBase.findMany({
       where: { orgId },
       include: { _count: { select: { documents: true } } },
@@ -103,7 +106,8 @@ router.get('/knowledge-bases', authenticate, requireOrg, async (req, res, next) 
 
 router.post('/knowledge-bases', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { name, description } = z.object({
       name: z.string().min(1),
       description: z.string().optional(),

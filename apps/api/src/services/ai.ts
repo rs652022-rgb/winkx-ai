@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../lib/logger';
 
 interface GeminiPart {
   text: string;
@@ -84,41 +85,49 @@ export async function generateFlowWithAI(
 
   let responseText = '';
 
-  if (provider === 'anthropic' && anthropic) {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-    responseText = (response.content[0] as any).text;
-  } else if (provider === 'gemini') {
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-          generationConfig: { maxOutputTokens: 4000, temperature: 0.7 },
-        }),
+  try {
+    if (provider === 'anthropic' && anthropic) {
+      const response = await anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+      responseText = (response.content[0] as any).text;
+    } else if (provider === 'gemini') {
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+            generationConfig: { maxOutputTokens: 4000, temperature: 0.7 },
+          }),
+        }
+      );
+      if (!geminiResponse.ok) {
+        throw new Error(`Gemini API error: ${geminiResponse.status} ${geminiResponse.statusText}`);
       }
-    );
-    const geminiData = (await geminiResponse.json()) as GeminiResponse;
-    responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  } else if (openai) {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 4000,
-      response_format: { type: 'json_object' },
-    });
-    responseText = response.choices[0]?.message?.content || '{}';
-  } else {
-    // Fallback: return a template flow
+      const geminiData = (await geminiResponse.json()) as GeminiResponse;
+      responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } else if (openai) {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: 4000,
+        response_format: { type: 'json_object' },
+      });
+      responseText = response.choices[0]?.message?.content || '{}';
+    } else {
+      // Fallback: return a template flow
+      return generateFallbackFlow(prompt, channelType);
+    }
+  } catch (error) {
+    logger.error('AI Flow Generation API invocation failed:', error);
     return generateFallbackFlow(prompt, channelType);
   }
 
@@ -202,38 +211,46 @@ export async function chatWithAI(
     { role: 'user' as const, content: userMessage },
   ];
 
-  if (agent.provider === 'ANTHROPIC' && anthropic) {
-    const response = await anthropic.messages.create({
-      model: agent.model || 'claude-3-5-sonnet-20241022',
-      max_tokens: agent.maxTokens || 1000,
-      system: fullSystem,
-      messages,
-    });
-    return (response.content[0] as any).text;
-  } else if (agent.provider === 'GEMINI') {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${agent.model || 'gemini-1.5-flash'}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            { role: 'user', parts: [{ text: fullSystem }] },
-            ...messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-          ],
-        }),
+  try {
+    if (agent.provider === 'ANTHROPIC' && anthropic) {
+      const response = await anthropic.messages.create({
+        model: agent.model || 'claude-3-5-sonnet-20241022',
+        max_tokens: agent.maxTokens || 1000,
+        system: fullSystem,
+        messages,
+      });
+      return (response.content[0] as any).text;
+    } else if (agent.provider === 'GEMINI') {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${agent.model || 'gemini-1.5-flash'}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { role: 'user', parts: [{ text: fullSystem }] },
+              ...messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+            ],
+          }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
       }
-    );
-    const data = (await response.json()) as GeminiResponse;
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || agent.fallbackMessage || 'I\'m not sure about that.';
-  } else if (openai) {
-    const response = await openai.chat.completions.create({
-      model: agent.model || 'gpt-4o',
-      max_tokens: agent.maxTokens || 1000,
-      temperature: agent.temperature || 0.7,
-      messages: [{ role: 'system', content: fullSystem }, ...messages],
-    });
-    return response.choices[0]?.message?.content || agent.fallbackMessage || 'I\'m not sure about that.';
+      const data = (await response.json()) as GeminiResponse;
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || agent.fallbackMessage || 'I\'m not sure about that.';
+    } else if (openai) {
+      const response = await openai.chat.completions.create({
+        model: agent.model || 'gpt-4o',
+        max_tokens: agent.maxTokens || 1000,
+        temperature: agent.temperature || 0.7,
+        messages: [{ role: 'system', content: fullSystem }, ...messages],
+      });
+      return response.choices[0]?.message?.content || agent.fallbackMessage || 'I\'m not sure about that.';
+    }
+  } catch (error) {
+    logger.error(`AI Chat API invocation failed for agent ${agent.id}:`, error);
+    return agent.fallbackMessage || 'I\'m currently unable to respond. Please try again later.';
   }
 
   return agent.fallbackMessage || 'I\'m currently unable to respond. Please try again later.';
@@ -312,20 +329,29 @@ Generate 3 different variations. Return as JSON array: ["variation 1", "variatio
 
   let text = '';
 
-  if (params.provider === 'anthropic' && anthropic) {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 1000,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    text = (response.content[0] as any).text;
-  } else if (openai) {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-    });
-    text = response.choices[0]?.message?.content || '{"variations": []}';
+  try {
+    if (params.provider === 'anthropic' && anthropic) {
+      const response = await anthropic.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      text = (response.content[0] as any).text;
+    } else if (openai) {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+      });
+      text = response.choices[0]?.message?.content || '{"variations": []}';
+    }
+  } catch (error) {
+    logger.error('AI Content Generation API invocation failed:', error);
+    return [
+      `Variation 1: ${params.context}`,
+      `Variation 2: ${params.context}`,
+      `Variation 3: ${params.context}`,
+    ];
   }
 
   try {

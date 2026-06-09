@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg } from '../middleware/auth';
+import { authenticate, requireOrg, getRequestOrgId } from '../middleware/auth';
 
 const router = Router();
 
 // CONTACTS
 router.get('/contacts', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { search, tag, channel, page = '1', limit = '25' } = req.query;
 
     const where: any = { orgId };
@@ -42,7 +43,8 @@ router.get('/contacts', authenticate, requireOrg, async (req, res, next) => {
 
 router.post('/contacts', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const data = z.object({
       firstName: z.string().optional(),
       lastName: z.string().optional(),
@@ -104,7 +106,8 @@ router.delete('/contacts/:contactId', authenticate, requireOrg, async (req, res,
 // LEADS
 router.get('/leads', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { status, assignedToId, search, page = '1', limit = '25' } = req.query;
 
     const where: any = { orgId };
@@ -138,7 +141,8 @@ router.get('/leads', authenticate, requireOrg, async (req, res, next) => {
 
 router.post('/leads', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const data = z.object({
       contactId: z.string().optional(),
       status: z.string().optional(),
@@ -179,7 +183,8 @@ router.patch('/leads/:leadId', authenticate, requireOrg, async (req, res, next) 
 // PIPELINES & DEALS
 router.get('/pipelines', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const pipelines = await prisma.pipeline.findMany({
       where: { orgId },
       include: {
@@ -199,7 +204,8 @@ router.get('/pipelines', authenticate, requireOrg, async (req, res, next) => {
 router.post('/pipelines', authenticate, requireOrg, async (req, res, next) => {
   try {
     const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const pipeline = await prisma.pipeline.create({ data: { orgId, name } });
     res.status(201).json({ pipeline });
   } catch (error) { next(error); }
@@ -207,7 +213,8 @@ router.post('/pipelines', authenticate, requireOrg, async (req, res, next) => {
 
 router.get('/deals', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { pipelineId, stage } = req.query;
 
     const deals = await prisma.deal.findMany({
@@ -293,7 +300,8 @@ router.get('/tasks', authenticate, requireOrg, async (req, res, next) => {
 
 router.post('/tasks', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const data = z.object({
       title: z.string(),
       description: z.string().optional(),

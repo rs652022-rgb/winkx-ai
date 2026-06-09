@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg } from '../middleware/auth';
+import { authenticate, requireOrg, getRequestOrgId } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const webhooks = await prisma.webhook.findMany({
       where: { orgId },
       include: {

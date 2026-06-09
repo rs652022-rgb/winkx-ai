@@ -260,8 +260,9 @@ router.post('/logout', authenticate, async (req, res, next) => {
  */
 router.get('/me', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       include: {
         orgMemberships: {
           include: { org: true },
@@ -364,13 +365,14 @@ router.post('/reset-password', authRateLimiter, async (req, res, next) => {
  */
 router.post('/2fa/setup', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const secret = authenticator.generateSecret();
-    const otpauth = authenticator.keyuri(req.user!.email, 'WinkX AI', secret);
+    const otpauth = authenticator.keyuri(req.user.email, 'WinkX AI', secret);
     const qr = await qrcode.toDataURL(otpauth);
 
     // Store temp secret
     await prisma.user.update({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       data: { twoFactorSecret: secret },
     });
 
@@ -389,9 +391,10 @@ router.post('/2fa/setup', authenticate, async (req, res, next) => {
  */
 router.post('/2fa/verify', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const { code } = z.object({ code: z.string().length(6) }).parse(req.body);
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user?.twoFactorSecret) {
       return res.status(400).json({ error: '2FA setup not initiated' });
     }
@@ -404,7 +407,7 @@ router.post('/2fa/verify', authenticate, async (req, res, next) => {
     const backupCodes = Array.from({ length: 8 }, () => uuidv4().replace(/-/g, '').substring(0, 10));
 
     await prisma.user.update({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       data: { twoFactorEnabled: true, backupCodes },
     });
 
@@ -423,8 +426,9 @@ router.post('/2fa/verify', authenticate, async (req, res, next) => {
  */
 router.post('/2fa/disable', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     await prisma.user.update({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       data: {
         twoFactorEnabled: false,
         twoFactorSecret: null,
@@ -530,6 +534,7 @@ router.post('/google', authRateLimiter, async (req, res, next) => {
  */
 router.patch('/profile', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const data = z.object({
       firstName: z.string().min(1).optional(),
       lastName: z.string().min(1).optional(),
@@ -539,7 +544,7 @@ router.patch('/profile', authenticate, async (req, res, next) => {
     }).parse(req.body);
 
     const user = await prisma.user.update({
-      where: { id: req.user!.id },
+      where: { id: req.user.id },
       data,
       select: {
         id: true, email: true, firstName: true, lastName: true,

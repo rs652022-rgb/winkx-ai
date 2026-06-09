@@ -17,8 +17,9 @@ const router = Router();
  */
 router.get('/', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const memberships = await prisma.orgMember.findMany({
-      where: { userId: req.user!.id },
+      where: { userId: req.user.id },
       include: {
         org: {
           include: {
@@ -46,6 +47,7 @@ router.get('/', authenticate, async (req, res, next) => {
  */
 router.post('/', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const data = z.object({
       name: z.string().min(1).max(100),
       website: z.string().url().optional(),
@@ -62,10 +64,10 @@ router.post('/', authenticate, async (req, res, next) => {
         website: data.website,
         industry: data.industry,
         timezone: data.timezone || 'UTC',
-        createdById: req.user!.id,
+        createdById: req.user.id,
         members: {
           create: {
-            userId: req.user!.id,
+            userId: req.user.id,
             role: 'ADMIN',
             isOwner: true,
           },
@@ -215,6 +217,7 @@ router.delete('/:orgId/members/:memberId', authenticate, requireOrg, requireRole
  */
 router.post('/:orgId/invites', authenticate, requireOrg, requireRole('ADMIN'), async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const { email, role } = z.object({
       email: z.string().email(),
       role: z.enum(['ADMIN', 'MEMBER', 'VIEWER', 'AGENT']).default('MEMBER'),
@@ -237,7 +240,7 @@ router.post('/:orgId/invites', authenticate, requireOrg, requireRole('ADMIN'), a
         email,
         role: role as any,
         token,
-        invitedById: req.user!.id,
+        invitedById: req.user.id,
         expiresAt,
       },
       include: { org: true },
@@ -248,7 +251,7 @@ router.post('/:orgId/invites', authenticate, requireOrg, requireRole('ADMIN'), a
       subject: `You've been invited to ${invite.org.name} on WinkX AI`,
       html: `
         <h2>Join ${invite.org.name}</h2>
-        <p>${req.user!.firstName} invited you to join their WinkX AI workspace.</p>
+        <p>${req.user.firstName} invited you to join their WinkX AI workspace.</p>
         <a href="${process.env.FRONTEND_URL}/invite/${token}">Accept Invitation</a>
       `,
     });
@@ -268,6 +271,7 @@ router.post('/:orgId/invites', authenticate, requireOrg, requireRole('ADMIN'), a
  */
 router.post('/invites/:token/accept', authenticate, async (req, res, next) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
     const invite = await prisma.orgInvite.findUnique({
       where: { token: req.params.token },
     });
@@ -276,19 +280,19 @@ router.post('/invites/:token/accept', authenticate, async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid or expired invite' });
     }
 
-    if (invite.email !== req.user!.email) {
+    if (invite.email !== req.user.email) {
       return res.status(403).json({ error: 'This invite is for a different email address' });
     }
 
     const existingMember = await prisma.orgMember.findUnique({
-      where: { orgId_userId: { orgId: invite.orgId, userId: req.user!.id } },
+      where: { orgId_userId: { orgId: invite.orgId, userId: req.user.id } },
     });
 
     if (!existingMember) {
       await prisma.orgMember.create({
         data: {
           orgId: invite.orgId,
-          userId: req.user!.id,
+          userId: req.user.id,
           role: invite.role,
         },
       });

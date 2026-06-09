@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg, requireRole } from '../middleware/auth';
+import { authenticate, requireOrg, requireRole, getRequestOrgId } from '../middleware/auth';
 
 const router = Router();
 
@@ -26,7 +26,8 @@ interface FacebookVerifyResponse {
  */
 router.get('/', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     const channels = await prisma.channel.findMany({
       where: { orgId },
@@ -54,7 +55,8 @@ router.get('/', authenticate, requireOrg, async (req, res, next) => {
  */
 router.post('/connect/whatsapp', authenticate, requireOrg, requireRole('ADMIN', 'MEMBER'), async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     const data = z.object({
       name: z.string(),
@@ -64,9 +66,14 @@ router.post('/connect/whatsapp', authenticate, requireOrg, requireRole('ADMIN', 
     }).parse(req.body);
 
     // Verify with Meta API
-    const verifyResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${data.wabaId}?access_token=${data.accessToken}`
-    );
+    let verifyResponse;
+    try {
+      verifyResponse = await fetch(
+        `https://graph.facebook.com/v18.0/${data.wabaId}?access_token=${data.accessToken}`
+      );
+    } catch (error: any) {
+      return res.status(502).json({ error: 'Failed to reach Meta API: ' + (error.message || String(error)) });
+    }
 
     if (!verifyResponse.ok) {
       return res.status(400).json({ error: 'Invalid WhatsApp Business Account credentials' });
@@ -108,7 +115,8 @@ router.post('/connect/whatsapp', authenticate, requireOrg, requireRole('ADMIN', 
  */
 router.post('/connect/instagram', authenticate, requireOrg, requireRole('ADMIN', 'MEMBER'), async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     const data = z.object({
       name: z.string(),
@@ -118,9 +126,14 @@ router.post('/connect/instagram', authenticate, requireOrg, requireRole('ADMIN',
     }).parse(req.body);
 
     // Verify with Meta API
-    const verifyResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${data.igAccountId}?fields=id,name,username&access_token=${data.accessToken}`
-    );
+    let verifyResponse;
+    try {
+      verifyResponse = await fetch(
+        `https://graph.facebook.com/v18.0/${data.igAccountId}?fields=id,name,username&access_token=${data.accessToken}`
+      );
+    } catch (error: any) {
+      return res.status(502).json({ error: 'Failed to reach Meta API: ' + (error.message || String(error)) });
+    }
 
     if (!verifyResponse.ok) {
       return res.status(400).json({ error: 'Invalid Instagram Business account credentials' });
@@ -164,7 +177,8 @@ router.post('/connect/instagram', authenticate, requireOrg, requireRole('ADMIN',
  */
 router.post('/connect/facebook', authenticate, requireOrg, requireRole('ADMIN', 'MEMBER'), async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     const data = z.object({
       name: z.string(),
@@ -172,9 +186,14 @@ router.post('/connect/facebook', authenticate, requireOrg, requireRole('ADMIN', 
       accessToken: z.string(),
     }).parse(req.body);
 
-    const verifyResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${data.pageId}?fields=id,name,fan_count&access_token=${data.accessToken}`
-    );
+    let verifyResponse;
+    try {
+      verifyResponse = await fetch(
+        `https://graph.facebook.com/v18.0/${data.pageId}?fields=id,name,fan_count&access_token=${data.accessToken}`
+      );
+    } catch (error: any) {
+      return res.status(502).json({ error: 'Failed to reach Meta API: ' + (error.message || String(error)) });
+    }
 
     if (!verifyResponse.ok) {
       return res.status(400).json({ error: 'Invalid Facebook Page credentials' });
@@ -217,7 +236,8 @@ router.post('/connect/facebook', authenticate, requireOrg, requireRole('ADMIN', 
  */
 router.delete('/:channelId', authenticate, requireOrg, requireRole('ADMIN'), async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
 
     await prisma.channel.update({
       where: { id: req.params.channelId, orgId },
@@ -239,7 +259,8 @@ router.delete('/:channelId', authenticate, requireOrg, requireRole('ADMIN'), asy
  */
 router.post('/:channelId/reconnect', authenticate, requireOrg, requireRole('ADMIN'), async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { accessToken } = z.object({ accessToken: z.string() }).parse(req.body);
 
     const channel = await prisma.channel.update({

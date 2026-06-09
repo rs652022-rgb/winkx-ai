@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg } from '../middleware/auth';
+import { authenticate, requireOrg, getRequestOrgId } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
@@ -11,7 +11,8 @@ const router = Router();
 // API KEYS
 router.get('/keys', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const keys = await prisma.apiKey.findMany({
       where: { orgId },
       select: {
@@ -26,7 +27,8 @@ router.get('/keys', authenticate, requireOrg, async (req, res, next) => {
 
 router.post('/keys', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { name, permissions, expiresAt } = z.object({
       name: z.string().min(1),
       permissions: z.array(z.string()).default(['read']),
@@ -59,7 +61,8 @@ router.delete('/keys/:keyId', authenticate, requireOrg, async (req, res, next) =
 // WEBHOOKS
 router.get('/webhooks', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const webhooks = await prisma.webhook.findMany({
       where: { orgId },
       include: { _count: { select: { logs: true } } },
@@ -71,7 +74,8 @@ router.get('/webhooks', authenticate, requireOrg, async (req, res, next) => {
 
 router.post('/webhooks', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const { name, url, events } = z.object({
       name: z.string(),
       url: z.string().url(),

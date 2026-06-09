@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import Stripe from 'stripe';
 import prisma from '@winkx/db/src/client';
-import { authenticate, requireOrg, requireRole } from '../middleware/auth';
+import { authenticate, requireOrg, requireRole, getRequestOrgId } from '../middleware/auth';
 
 const router = Router();
 
@@ -22,7 +22,8 @@ router.get('/plans', async (req, res, next) => {
 
 router.get('/subscription', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const subscription = await prisma.subscription.findUnique({
       where: { orgId },
       include: { plan: true },
@@ -34,13 +35,15 @@ router.get('/subscription', authenticate, requireOrg, async (req, res, next) => 
 router.post('/checkout', authenticate, requireOrg, requireRole('ADMIN'), async (req, res, next) => {
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+    if (!req.user) return res.status(401).json({ error: 'User authentication required' });
 
     const { planId, interval } = z.object({
       planId: z.string(),
       interval: z.enum(['month', 'year']).default('month'),
     }).parse(req.body);
 
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
@@ -49,7 +52,7 @@ router.post('/checkout', authenticate, requireOrg, requireRole('ADMIN'), async (
     let customerId = org?.stripeCustomerId;
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: req.user!.email,
+        email: req.user.email,
         name: org?.name,
         metadata: { orgId },
       });
@@ -77,7 +80,8 @@ router.post('/portal', authenticate, requireOrg, requireRole('ADMIN'), async (re
   try {
     if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
 
-    const orgId = req.orgMember!.orgId;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
 
     if (!org?.stripeCustomerId) {
@@ -174,7 +178,8 @@ router.post('/webhook', async (req, res, next) => {
 
 router.get('/usage', authenticate, requireOrg, async (req, res, next) => {
   try {
-    const orgId = req.orgMember?.orgId || req.apiKeyOrgId!;
+    const orgId = getRequestOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'Organization ID is required' });
     const today = new Date(new Date().toISOString().split('T')[0]);
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
